@@ -82,3 +82,29 @@ def test_unknown_attendee(client):
         },
     )
     assert res.status_code == 400
+    
+
+def test_back_to_back_bookings_are_allowed(client):
+    first = client.post(
+        "/bookings",
+        json={
+            "room_id": 1,
+            "creator_id": 1,
+            "attendee_ids": [1],
+            "start": "2026-12-10T10:00:00",
+            "end": "2026-12-10T11:00:00",
+        },
+    )
+    assert first.status_code == 201
+
+    second = client.post(
+        "/bookings",
+        json={
+            "room_id": 1,
+            "creator_id": 2,
+            "attendee_ids": [2],
+            "start": "2026-12-10T11:00:00",
+            "end": "2026-12-10T12:00:00",
+        },
+    )
+    assert second.status_code == 201
