@@ -82,7 +82,7 @@ def test_unknown_attendee(client):
         },
     )
     assert res.status_code == 400
-    
+
 
 def test_back_to_back_bookings_are_allowed(client):
     first = client.post(
