@@ -61,3 +61,24 @@ AI assistance was used to understand the existing overlap logic, identify the bo
 ### Testing
 - Added tests for duration validation, weekends, Board Room restrictions, lunch-hour rules, participant conflicts across rooms, and cleaning buffers.
 - Verified the existing Task 1 back-to-back booking regression test still passes.
+
+
+## Task 3 – Prevent concurrent double booking
+
+### Approach
+Used PostgreSQL row-level locking with SQLAlchemy's `SELECT ... FOR UPDATE` (`with_for_update()`) on the room row.
+
+### Implementation
+- The booking endpoint locks the requested room before checking existing bookings.
+- The availability check and booking insertion happen within the same database transaction.
+- Concurrent requests for the same room wait for the lock.
+- Once the first request commits, the waiting request checks availability again and receives `409 Conflict` if the requested slot is occupied.
+
+### Testing
+Added a concurrency test that sends two simultaneous requests for the same room and time. It verifies that exactly one request succeeds (`201`) and the other receives `409`.
+
+### Trade-offs and limitations
+- This implementation relies on PostgreSQL row-level locking. SQLite does not provide equivalent `SELECT FOR UPDATE` behavior.
+- Locking the room serializes booking requests for that room, even when their requested time slots do not overlap.
+- This protects room availability but does not fully prevent concurrent attendee conflicts across different rooms. Participant-level locking or database-level constraints would be needed for that.
+- A future improvement could use PostgreSQL exclusion constraints for room-time conflicts.

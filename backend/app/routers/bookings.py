@@ -31,23 +31,43 @@ def list_bookings(
     return db.scalars(query).all()
 
 
+
 @router.post("", response_model=BookingOut, status_code=201)
 def create_booking(payload: BookingIn, db: Session = Depends(get_db)):
-    room = db.get(Room, payload.room_id)
+    # Lock the room row until this transaction commits or rolls back.
+    # Concurrent bookings for this room must wait here.
+    room = db.scalar(
+        select(Room)
+        .where(Room.id == payload.room_id)
+        .with_for_update()
+    )
+
     if room is None:
         raise HTTPException(status_code=404, detail="Room not found")
+
     if db.get(User, payload.creator_id) is None:
         raise HTTPException(status_code=404, detail="Creator not found")
 
     attendee_ids = set(payload.attendee_ids)
-    attendees = db.scalars(select(User).where(User.id.in_(attendee_ids))).all()
+    attendees = db.scalars(
+        select(User).where(User.id.in_(attendee_ids))
+    ).all()
+
     if len(attendees) != len(attendee_ids):
         raise HTTPException(status_code=400, detail="Unknown attendee")
 
-    existing = db.scalars(select(Booking).where(Booking.room_id == room.id)).all()
+    # This check happens AFTER acquiring the room lock.
+    # A waiting request will therefore see the previous request's booking.
+    existing = db.scalars(
+        select(Booking).where(Booking.room_id == room.id)
+    ).all()
+
     for other in existing:
         if overlaps(other.start, other.end, payload.start, payload.end):
-            raise HTTPException(status_code=409, detail="Room is already booked for that time")
+            raise HTTPException(
+                status_code=409,
+                detail="Room is already booked for that time",
+            )
 
     booking = Booking(
         room_id=room.id,
@@ -57,7 +77,9 @@ def create_booking(payload: BookingIn, db: Session = Depends(get_db)):
         end=payload.end,
         attendees=list(attendees),
     )
+
     db.add(booking)
     db.commit()
     db.refresh(booking)
+
     return booking

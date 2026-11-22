@@ -1,3 +1,5 @@
+from concurrent.futures import ThreadPoolExecutor
+
 def test_list_bookings_for_date(client):
     res = client.get("/bookings", params={"date": "2026-12-07"})
     assert res.status_code == 200
@@ -108,3 +110,27 @@ def test_back_to_back_bookings_are_allowed(client):
         },
     )
     assert second.status_code == 201
+
+
+
+def test_concurrent_bookings_only_one_succeeds(client):
+    payload = {
+        "room_id": 2,
+        "creator_id": 1,
+        "attendee_ids": [1],
+        "title": "Concurrent meeting",
+        "start": "2026-12-15T10:00:00",
+        "end": "2026-12-15T11:00:00",
+    }
+
+    with ThreadPoolExecutor(max_workers=2) as executor:
+        futures = [
+            executor.submit(client.post, "/bookings", json=payload)
+            for _ in range(2)
+        ]
+
+        responses = [future.result(timeout=15) for future in futures]
+
+    status_codes = sorted(response.status_code for response in responses)
+
+    assert status_codes == [201, 409]
