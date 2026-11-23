@@ -52,6 +52,7 @@ class BookingOut(BaseModel):
     title: str
     room: RoomOut
     creator_id: int
+    creator: UserOut
     attendees: list[UserOut]
     start: datetime
     end: datetime
