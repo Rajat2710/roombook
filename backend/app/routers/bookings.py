@@ -1,3 +1,4 @@
+
 from datetime import date, datetime, time, timedelta
 
 from fastapi import APIRouter, Depends, HTTPException
@@ -20,22 +21,30 @@ def list_bookings(
 ):
     query = (
         select(Booking)
-        .options(selectinload(Booking.attendees), selectinload(Booking.room))
+        .options(
+            selectinload(Booking.attendees),
+            selectinload(Booking.creator),
+            selectinload(Booking.room),
+        )
         .order_by(Booking.start)
     )
+
     if date is not None:
         day_start = datetime.combine(date, time.min)
-        query = query.where(Booking.start >= day_start, Booking.start < day_start + timedelta(days=1))
+        query = query.where(
+            Booking.start >= day_start,
+            Booking.start < day_start + timedelta(days=1),
+        )
+
     if room_id is not None:
         query = query.where(Booking.room_id == room_id)
-    return db.scalars(query).all()
 
+    return db.scalars(query).all()
 
 
 @router.post("", response_model=BookingOut, status_code=201)
 def create_booking(payload: BookingIn, db: Session = Depends(get_db)):
-    # Lock the room row until this transaction commits or rolls back.
-    # Concurrent bookings for this room must wait here.
+    # Lock the room row to prevent concurrent bookings.
     room = db.scalar(
         select(Room)
         .where(Room.id == payload.room_id)
@@ -45,10 +54,13 @@ def create_booking(payload: BookingIn, db: Session = Depends(get_db)):
     if room is None:
         raise HTTPException(status_code=404, detail="Room not found")
 
-    if db.get(User, payload.creator_id) is None:
+    creator = db.get(User, payload.creator_id)
+
+    if creator is None:
         raise HTTPException(status_code=404, detail="Creator not found")
 
     attendee_ids = set(payload.attendee_ids)
+
     attendees = db.scalars(
         select(User).where(User.id.in_(attendee_ids))
     ).all()
@@ -56,8 +68,7 @@ def create_booking(payload: BookingIn, db: Session = Depends(get_db)):
     if len(attendees) != len(attendee_ids):
         raise HTTPException(status_code=400, detail="Unknown attendee")
 
-    # This check happens AFTER acquiring the room lock.
-    # A waiting request will therefore see the previous request's booking.
+    # Check room availability after acquiring the lock.
     existing = db.scalars(
         select(Booking).where(Booking.room_id == room.id)
     ).all()
@@ -80,6 +91,18 @@ def create_booking(payload: BookingIn, db: Session = Depends(get_db)):
 
     db.add(booking)
     db.commit()
+
+    # Reload relationships so the response includes creator, room and attendees.
     db.refresh(booking)
+
+    booking = db.scalar(
+        select(Booking)
+        .where(Booking.id == booking.id)
+        .options(
+            selectinload(Booking.creator),
+            selectinload(Booking.attendees),
+            selectinload(Booking.room),
+        )
+    )
 
     return booking
