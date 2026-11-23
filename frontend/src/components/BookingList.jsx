@@ -41,7 +41,6 @@ export default function BookingList({ date, refreshKey }) {
       <h2>Bookings for {date}</h2>
 
       {loading && <p className="muted">Loading...</p>}
-
       {error && <p className="error">{error}</p>}
 
       {!loading && !error && bookings.length === 0 && (
@@ -50,25 +49,42 @@ export default function BookingList({ date, refreshKey }) {
 
       {!loading && !error && bookings.length > 0 && (
         <table>
+          <thead>
+            <tr>
+              <th>Time</th>
+              <th>Room</th>
+              <th>Meeting</th>
+              <th>Participants</th>
+            </tr>
+          </thead>
+
           <tbody>
-            {bookings.map((booking) => (
-              <tr key={booking.id}>
-                <td className="time">
-                  {formatTime(booking.start)}–
-                  {formatTime(booking.end)}
-                </td>
+            {bookings.map((booking) => {
+              // Include creator and attendees, without duplicate users.
+              const participants = [
+                booking.creator,
+                ...booking.attendees,
+              ].filter(
+                (user, index, users) =>
+                  users.findIndex((item) => item.id === user.id) === index
+              );
 
-                <td>{booking.room.name}</td>
+              return (
+                <tr key={booking.id}>
+                  <td className="time">
+                    {formatTime(booking.start)}–
+                    {formatTime(booking.end)}
+                  </td>
 
-                <td>{booking.title}</td>
+                  <td>{booking.room.name}</td>
+                  <td>{booking.title}</td>
 
-                <td className="muted">
-                  {booking.attendees
-                    .map((attendee) => attendee.name)
-                    .join(", ")}
-                </td>
-              </tr>
-            ))}
+                  <td className="muted">
+                    {participants.map((user) => user.name).join(", ")}
+                  </td>
+                </tr>
+              );
+            })}
           </tbody>
         </table>
       )}
