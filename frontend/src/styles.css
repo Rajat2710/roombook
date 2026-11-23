@@ -1,3 +1,4 @@
+
 :root {
   font-family: system-ui, -apple-system, "Segoe UI", sans-serif;
   color: #1f2328;
@@ -26,6 +27,15 @@ h1 {
   margin: 0;
 }
 
+h2 {
+  margin-top: 0;
+  font-size: 1.1rem;
+}
+
+h3 {
+  font-size: 1rem;
+}
+
 .date-nav {
   display: flex;
   gap: 8px;
@@ -51,13 +61,102 @@ h1 {
   padding: 16px;
 }
 
-.card h2 {
-  margin-top: 0;
-  font-size: 1.1rem;
+.find-slot {
+  margin-top: 16px;
 }
 
-ul {
-  padding-left: 18px;
+.find-slot form {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 14px;
+}
+
+.find-slot form > label {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+  font-weight: 600;
+}
+
+.find-slot input[type="text"],
+.find-slot select {
+  width: 100%;
+  box-sizing: border-box;
+  padding: 9px;
+  border: 1px solid #d0d7de;
+  border-radius: 6px;
+  background: white;
+  font: inherit;
+}
+
+.find-slot fieldset {
+  border: 1px solid #d0d7de;
+  border-radius: 6px;
+  min-width: 0;
+}
+
+.find-slot legend {
+  font-weight: 600;
+}
+
+.attendee-option {
+  display: inline-flex;
+  align-items: center;
+  gap: 5px;
+  margin: 6px 12px 6px 0;
+  font-weight: normal;
+}
+
+.selected-date {
+  align-self: center;
+}
+
+.find-slot button {
+  padding: 9px 14px;
+  border: 0;
+  border-radius: 6px;
+  background: #0969da;
+  color: white;
+  font: inherit;
+  cursor: pointer;
+}
+
+.find-slot button:hover:not(:disabled) {
+  background: #0550ae;
+}
+
+.find-slot button:disabled {
+  opacity: 0.6;
+  cursor: not-allowed;
+}
+
+.suggested-slots {
+  margin-top: 20px;
+}
+
+.slot {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  gap: 12px;
+  padding: 10px 0;
+  border-top: 1px solid #eaeef2;
+}
+
+.slot span {
+  font-variant-numeric: tabular-nums;
+}
+
+.success {
+  color: #1a7f37;
+}
+
+.error {
+  color: #cf222e;
+}
+
+.muted {
+  color: #656d76;
 }
 
 table {
@@ -75,10 +174,17 @@ td {
   font-variant-numeric: tabular-nums;
 }
 
-.muted {
-  color: #656d76;
+ul {
+  padding-left: 18px;
 }
 
-.error {
-  color: #cf222e;
+@media (max-width: 600px) {
+  .find-slot form {
+    grid-template-columns: 1fr;
+  }
+
+  .slot {
+    align-items: flex-start;
+  }
 }
+
