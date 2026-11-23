@@ -1,84 +1,50 @@
-Decisions and Trade-offs
+# Decisions and Trade-offs
 
-Task 1: Back-to-Back Booking Fix
+## Task 1: Back-to-Back Booking Fix
 
-Assumption
+- **Assumption:** Booking intervals are half-open `[start, end)`, so a booking can start exactly when another ends.
+- **Implementation:** Updated the `overlaps()` function to use strict comparisons and added a regression test.
+- **Other issues identified:**
+  - Attendee conflicts across different rooms were not checked. (High)
+  - Concurrent requests could create double bookings. (High)
+  - Datetime validation removed timezone information instead of consistently handling IST. (Medium)
+- **AI usage:** Used ChatGPT to understand the overlap logic and develop the fix and test. Reviewed the implementation locally.
 
-Booking time intervals are treated as half-open intervals [start, end). The start time is inclusive, while the end time is exclusive.
+## Task 2: Find a Slot API
 
-Implementation
+- **Assumptions:**
+  - The requester is included in participant availability checks, even if not listed in `attendee_ids`.
+  - The intern restriction applies to the requester booking the Board Room.
+  - Cleaning buffers apply to room availability, not attendee availability.
+- **Implementation:** Added `POST /rooms/{room_id}/suggest`. It checks room and participant availability, generates candidates at 15-minute intervals and returns the earliest three valid slots.
+- **Trade-off:** Availability is calculated by querying existing bookings rather than maintaining a separate availability calendar.
+- **Testing:** Added tests for lunch restrictions, cleaning buffers, participant conflicts, intern restrictions, weekends and invalid durations.
+- **AI usage:** Used ChatGPT for implementation guidance and test-case development. Verified the behavior with pytest.
 
-Updated the overlaps() function in backend/app/scheduling.py to use strict comparisons:
+## Task 3: Prevent Concurrent Double Booking
 
-Two bookings that end and start at the same time are allowed.
+- **Implementation:** Used PostgreSQL row-level locking (`SELECT FOR UPDATE`) on the room before checking availability and inserting a booking.
+- **Trade-off:** Requests for the same room are serialized, even when their time slots do not overlap. This relies on PostgreSQL locking and does not provide equivalent protection with SQLite.
+- **Limitation:** Concurrent attendee conflicts across different rooms are not fully prevented.
+- **Testing:** Added a concurrency test verifying that one request succeeds and the other receives `409 Conflict`.
+- **AI usage:** Used ChatGPT to understand and implement the locking approach, then verified it with PostgreSQL tests.
 
-Bookings with an actual time intersection are rejected.
+## Task 4: React UI
 
-Added a regression test in backend/tests/test_bookings.py to verify that consecutive bookings in the same room are accepted.
+- **Implementation:** Added a form to select a room, requester, attendees, date and duration; display suggested slots; and book a slot with one click.
+- Added loading, success and error states, and handling for slots taken by another user (`409 Conflict`).
+- Previous suggestions are cleared when availability-related inputs change.
+- The bookings calendar displays all bookings for the selected date, including creators and additional attendees.
+- **Trade-off:** Used React component state and existing API endpoints instead of introducing a global state-management library or additional backend endpoints.
+- **Testing:** Manually tested slot suggestions, booking, business rules, stale suggestions and concurrent booking attempts. Verified the frontend production build.
 
-Trade-offs
+## Future Improvements
 
-Half-open intervals provide a natural way to support consecutive bookings without requiring an artificial gap between meetings.
+- Add automated frontend tests.
+- Handle in-flight suggestion requests when search criteria change.
+- Add attendee-level concurrency protection across different rooms.
+- Add booking cancellation and editing.
 
-Other Issues Identified
+## AI Usage
 
-The booking creation endpoint checks room availability but does not check whether attendees have conflicting bookings in other rooms.
-
-The availability check and database insert are separate operations. Concurrent requests could both pass the availability check before either booking is inserted.
-
-The current schema validation removes timezone information rather than converting timestamps to the configured timezone.
-
-Future Improvements
-
-Add database-level protection against concurrent overlapping room bookings.
-
-Validate attendee availability across all rooms.
-
-Normalize and validate timestamps consistently using the Asia/Kolkata timezone.
-
-AI Usage
-
-AI assistance was used to understand the existing overlap logic, identify the boundary-condition bug, and develop a regression test. The implementation and test results were reviewed locally.
-
-
-
-
-## Task 2: Find a slot API
-
-### Assumptions
-- The requester is included in the participant conflict checks, even if they are not included in `attendee_ids`.
-- The intern restriction applies to the requester booking the Board Room. An intern attending a meeting booked by someone else does not independently prevent the booking.
-- Cleaning buffers apply to room availability, not attendee availability.
-- The 15-minute cleaning buffer is added after meetings longer than 60 minutes.
-
-### Implementation and trade-offs
-- Candidate slots are generated at 15-minute intervals, in chronological order, and the first three valid slots are returned.
-- Existing room bookings and participant bookings are queried for the requested date.
-- Participant conflicts include both booking creators and attendees.
-- Timezone-aware IST datetimes are returned by the suggestion API.
-- The implementation uses application-level availability checks. These checks alone do not prevent simultaneous booking requests; Task 3 will address that separately.
-
-### Testing
-- Added tests for duration validation, weekends, Board Room restrictions, lunch-hour rules, participant conflicts across rooms, and cleaning buffers.
-- Verified the existing Task 1 back-to-back booking regression test still passes.
-
-
-## Task 3 – Prevent concurrent double booking
-
-### Approach
-Used PostgreSQL row-level locking with SQLAlchemy's `SELECT ... FOR UPDATE` (`with_for_update()`) on the room row.
-
-### Implementation
-- The booking endpoint locks the requested room before checking existing bookings.
-- The availability check and booking insertion happen within the same database transaction.
-- Concurrent requests for the same room wait for the lock.
-- Once the first request commits, the waiting request checks availability again and receives `409 Conflict` if the requested slot is occupied.
-
-### Testing
-Added a concurrency test that sends two simultaneous requests for the same room and time. It verifies that exactly one request succeeds (`201`) and the other receives `409`.
-
-### Trade-offs and limitations
-- This implementation relies on PostgreSQL row-level locking. SQLite does not provide equivalent `SELECT FOR UPDATE` behavior.
-- Locking the room serializes booking requests for that room, even when their requested time slots do not overlap.
-- This protects room availability but does not fully prevent concurrent attendee conflicts across different rooms. Participant-level locking or database-level constraints would be needed for that.
-- A future improvement could use PostgreSQL exclusion constraints for room-time conflicts.
+Used ChatGPT throughout the assignment for code understanding, implementation guidance, debugging and test planning. AI initially suggested using GET for the slot suggestion endpoint, but the assignment specifies POST. I corrected this after checking the requirements.
